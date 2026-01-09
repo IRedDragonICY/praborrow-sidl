@@ -1,3 +1,8 @@
+//! Stable IDL (SIDL) macro generation.
+//!
+//! Provides `#[derive(Diplomat)]` for generating stable type IDs based on
+//! struct names. Used for cross-boundary type identification.
+
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput};

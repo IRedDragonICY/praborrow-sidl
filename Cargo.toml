@@ -2,7 +2,10 @@
 name = "praborrow-sidl"
 version.workspace = true
 edition.workspace = true
-description = "Procedural macro crate for generating Stable IDL (SIDL) and Diplomat trait implementations."
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Procedural macros for Stable IDL (SIDL) and Diplomat trait generation."
 
 [lib]
 proc-macro = true
