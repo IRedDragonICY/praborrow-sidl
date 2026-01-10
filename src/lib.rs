@@ -5,12 +5,12 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use syn::{DeriveInput, parse_macro_input};
 
 /// automatic implementation of the `Diplomat` trait.
-/// 
+///
 /// This macro calculates a stable logic hash based on the struct name and fields
 /// to generate a unique `TYPE_ID`.
 #[proc_macro_derive(Diplomat)]
