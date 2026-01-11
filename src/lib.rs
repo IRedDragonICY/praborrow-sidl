@@ -5,7 +5,6 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
-use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use syn::{DeriveInput, parse_macro_input};
 
@@ -18,11 +17,23 @@ pub fn derive_diplomat(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
 
-    // Calculate a simplistic stable hash
-    // In a real implementation, we would hash the recursive types of fields.
-    // Here we just hash the struct name to demonstrate the concept.
-    let mut hasher = DefaultHasher::new();
+    // Calculate a stable hash for the TYPE_ID.
+    // We use CRC64 (ISO) which is deterministic across platforms and Rust versions.
+    // DefaultHasher is not guaranteed to be stable.
+    struct StableHasher(crc64fast::Digest);
+    
+    impl std::hash::Hasher for StableHasher {
+        fn finish(&self) -> u64 {
+            self.0.sum64()
+        }
+        fn write(&mut self, bytes: &[u8]) {
+            self.0.write(bytes);
+        }
+    }
+
+    let mut hasher = StableHasher(crc64fast::Digest::new());
     name.to_string().hash(&mut hasher);
+    
     // Force non-zero
     let hash = hasher.finish() as u128;
     // ensure it's not 0 (though unlikely)
