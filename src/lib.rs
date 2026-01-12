@@ -21,7 +21,7 @@ pub fn derive_diplomat(input: TokenStream) -> TokenStream {
     // We use CRC64 (ISO) which is deterministic across platforms and Rust versions.
     // DefaultHasher is not guaranteed to be stable.
     struct StableHasher(crc64fast::Digest);
-    
+
     impl std::hash::Hasher for StableHasher {
         fn finish(&self) -> u64 {
             self.0.sum64()
@@ -33,7 +33,7 @@ pub fn derive_diplomat(input: TokenStream) -> TokenStream {
 
     let mut hasher = StableHasher(crc64fast::Digest::new());
     name.to_string().hash(&mut hasher);
-    
+
     // Force non-zero
     let hash = hasher.finish() as u128;
     // ensure it's not 0 (though unlikely)
