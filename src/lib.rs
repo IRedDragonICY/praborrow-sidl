@@ -43,6 +43,15 @@ pub fn derive_diplomat(input: TokenStream) -> TokenStream {
         impl crate::Diplomat for #name {
             const TYPE_ID: u128 = #type_id;
         }
+
+        impl std::fmt::Debug for dyn crate::Diplomat {
+             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                 f.debug_struct("Diplomat")
+                  .field("type_name", &stringify!(#name))
+                  .field("type_id", &Self::TYPE_ID)
+                  .finish()
+             }
+        }
     };
 
     TokenStream::from(expanded)
