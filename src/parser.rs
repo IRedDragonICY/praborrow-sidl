@@ -1,4 +1,4 @@
-use crate::error::SidlError;
+use crate::error::{SidlError, Location};
 use crate::lexer::{Lexer, Token};
 
 #[derive(Debug)]
@@ -30,19 +30,23 @@ pub enum Def {
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
     current_token: Token,
+    current_loc: Location,
 }
 
 impl<'a> Parser<'a> {
     pub fn new(mut lexer: Lexer<'a>) -> Result<Self, SidlError> {
-        let current_token = lexer.next_token()?;
+        let (current_token, current_loc) = lexer.next_token()?;
         Ok(Self {
             lexer,
             current_token,
+            current_loc,
         })
     }
 
     fn advance(&mut self) -> Result<(), SidlError> {
-        self.current_token = self.lexer.next_token()?;
+        let (token, loc) = self.lexer.next_token()?;
+        self.current_token = token;
+        self.current_loc = loc;
         Ok(())
     }
 
@@ -54,6 +58,7 @@ impl<'a> Parser<'a> {
             Err(SidlError::UnexpectedToken {
                 expected: format!("{:?}", expected),
                 found: format!("{:?}", self.current_token),
+                loc: self.current_loc,
             })
         }
     }
@@ -67,6 +72,7 @@ impl<'a> Parser<'a> {
             Err(SidlError::UnexpectedToken {
                 expected: "Identifier".to_string(),
                 found: format!("{:?}", self.current_token),
+                loc: self.current_loc,
             })
         }
     }
@@ -78,7 +84,10 @@ impl<'a> Parser<'a> {
                 Token::Struct => defs.push(Def::Struct(self.parse_struct()?)),
                 Token::Service => defs.push(Def::Service(self.parse_service()?)),
                 Token::Eof => break,
-                _ => return Err(SidlError::UnexpectedTopLevelToken(format!("{:?}", self.current_token))),
+                _ => return Err(SidlError::UnexpectedTopLevelToken(
+                    format!("{:?}", self.current_token), 
+                    self.current_loc
+                )),
             }
         }
         Ok(defs)
