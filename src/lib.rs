@@ -1,58 +1,84 @@
-//! Stable IDL (SIDL) macro generation.
-//!
-//! Provides `#[derive(Diplomat)]` for generating stable type IDs based on
-//! struct names. Used for cross-boundary type identification.
+mod lexer;
+mod parser;
 
+use crate::lexer::Lexer;
+use crate::parser::{Def, Parser};
 use proc_macro::TokenStream;
-use quote::quote;
-use std::hash::{Hash, Hasher};
-use syn::{DeriveInput, parse_macro_input};
+use quote::{format_ident, quote};
+use std::fs;
+use std::path::PathBuf;
 
-/// automatic implementation of the `Diplomat` trait.
-///
-/// This macro calculates a stable logic hash based on the struct name and fields
-/// to generate a unique `TYPE_ID`.
-#[proc_macro_derive(Diplomat)]
-pub fn derive_diplomat(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    let name = &input.ident;
+/// Macro to include a .sidl file and generate Rust code.
+#[proc_macro]
+pub fn include_sidl(input: TokenStream) -> TokenStream {
+    let input_path_str = input.to_string().trim_matches('"').to_string();
 
-    // Calculate a stable hash for the TYPE_ID.
-    // We use CRC64 (ISO) which is deterministic across platforms and Rust versions.
-    // DefaultHasher is not guaranteed to be stable.
-    struct StableHasher(crc64fast::Digest);
+    // Resolve path relative to CARGO_MANIFEST_DIR
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
+    let path = PathBuf::from(manifest_dir).join(&input_path_str);
 
-    impl std::hash::Hasher for StableHasher {
-        fn finish(&self) -> u64 {
-            self.0.sum64()
-        }
-        fn write(&mut self, bytes: &[u8]) {
-            self.0.write(bytes);
+    let sidl_content = match fs::read_to_string(&path) {
+        Ok(content) => content,
+        Err(e) => panic!("Failed to read SIDL file {:?}: {}", path, e),
+    };
+
+    let lexer = Lexer::new(&sidl_content);
+    let mut parser = Parser::new(lexer);
+    let defs = parser.parse();
+
+    let mut expanded_tokens = proc_macro2::TokenStream::new();
+
+    for def in defs {
+        match def {
+            Def::Struct(s) => {
+                let name = format_ident!("{}", s.name);
+                let fields = s.fields.iter().map(|(n, t)| {
+                    let field_name = format_ident!("{}", n);
+                    let field_type = format_ident!("{}", t);
+                    quote! { pub #field_name: #field_type, }
+                });
+
+                expanded_tokens.extend(quote! {
+                    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Diplomat)]
+                    pub struct #name {
+                        #(#fields)*
+                    }
+                });
+            }
+            Def::Service(s) => {
+                let name = format_ident!("{}", s.name);
+                let methods = s.methods.iter().map(|m| {
+                    let method_name = format_ident!("{}", m.name);
+                    let arg_name = format_ident!("{}", m.arg_name);
+                    let arg_type = format_ident!("{}", m.arg_type);
+                    let ret_type = format_ident!("{}", m.ret_type);
+
+                    quote! {
+                        async fn #method_name(&self, #arg_name: #arg_type) -> #ret_type;
+                    }
+                });
+
+                expanded_tokens.extend(quote! {
+                    #[async_trait::async_trait]
+                    pub trait #name {
+                        #(#methods)*
+                    }
+                });
+            }
         }
     }
 
-    let mut hasher = StableHasher(crc64fast::Digest::new());
-    name.to_string().hash(&mut hasher);
+    TokenStream::from(expanded_tokens)
+}
 
-    // Force non-zero
-    let hash = hasher.finish() as u128;
-    // ensure it's not 0 (though unlikely)
-    let type_id = if hash == 0 { 1 } else { hash };
+/// Derive macro for the `Diplomat` trait.
+#[proc_macro_derive(Diplomat)]
+pub fn derive_diplomat(input: TokenStream) -> TokenStream {
+    let input = syn::parse_macro_input!(input as syn::DeriveInput);
+    let name = input.ident;
 
     let expanded = quote! {
-        impl crate::Diplomat for #name {
-            const TYPE_ID: u128 = #type_id;
-        }
-
-        impl std::fmt::Debug for dyn crate::Diplomat {
-             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                 f.debug_struct("Diplomat")
-                  .field("type_name", &stringify!(#name))
-                  .field("type_id", &Self::TYPE_ID)
-                  .finish()
-             }
-        }
+        impl praborrow_diplomacy::Diplomat for #name {}
     };
-
     TokenStream::from(expanded)
 }
