@@ -1,5 +1,5 @@
-use thiserror::Error;
 use std::fmt;
+use thiserror::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Location {
@@ -29,6 +29,7 @@ pub enum SidlError {
     UnexpectedTopLevelToken(String, Location),
 
     #[error("Invalid syntax at {loc}: {msg}")]
+    #[allow(dead_code)]
     InvalidSyntax { msg: String, loc: Location },
 
     #[error("IO Error: {0}")]

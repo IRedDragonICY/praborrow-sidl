@@ -1,4 +1,4 @@
-use crate::error::{SidlError, Location};
+use crate::error::{Location, SidlError};
 use crate::lexer::{Lexer, Token};
 
 #[derive(Debug)]
@@ -84,10 +84,12 @@ impl<'a> Parser<'a> {
                 Token::Struct => defs.push(Def::Struct(self.parse_struct()?)),
                 Token::Service => defs.push(Def::Service(self.parse_service()?)),
                 Token::Eof => break,
-                _ => return Err(SidlError::UnexpectedTopLevelToken(
-                    format!("{:?}", self.current_token), 
-                    self.current_loc
-                )),
+                _ => {
+                    return Err(SidlError::UnexpectedTopLevelToken(
+                        format!("{:?}", self.current_token),
+                        self.current_loc,
+                    ));
+                }
             }
         }
         Ok(defs)

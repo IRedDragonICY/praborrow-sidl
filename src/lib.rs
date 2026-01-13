@@ -1,6 +1,6 @@
+mod error;
 mod lexer;
 mod parser;
-mod error;
 
 use crate::lexer::Lexer;
 use crate::parser::{Def, Parser};

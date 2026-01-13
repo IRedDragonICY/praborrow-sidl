@@ -1,5 +1,4 @@
 use praborrow_sidl::{Diplomat, include_sidl};
-use serde::{Deserialize, Serialize};
 
 // The include_sidl macro generates:
 // 1. struct User { ... } with #[derive(Diplomat)]

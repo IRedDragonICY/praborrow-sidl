@@ -1,4 +1,4 @@
-use crate::error::{SidlError, Location};
+use crate::error::{Location, SidlError};
 use std::iter::Peekable;
 use std::str::Chars;
 
@@ -57,23 +57,26 @@ impl<'a> Lexer<'a> {
                 }
                 Some('/') => {
                     self.advance(); // consume first '/'
-                     match self.peek_char() {
+                    match self.peek_char() {
                         Some('/') => {
-                             self.advance(); // consume second '/'
-                             while let Some(&c) = self.peek_char() {
-                                 if c == '\n' {
-                                     break;
-                                 }
-                                 self.advance();
-                             }
+                            self.advance(); // consume second '/'
+                            while let Some(&c) = self.peek_char() {
+                                if c == '\n' {
+                                    break;
+                                }
+                                self.advance();
+                            }
                         }
                         _ => {
-                             return Err(SidlError::UnexpectedChar { 
-                                 char: '/', 
-                                 loc: Location { line: self.line, col: self.col - 1 } 
-                             });
+                            return Err(SidlError::UnexpectedChar {
+                                char: '/',
+                                loc: Location {
+                                    line: self.line,
+                                    col: self.col - 1,
+                                },
+                            });
                         }
-                     }
+                    }
                 }
                 _ => break,
             }
@@ -84,7 +87,10 @@ impl<'a> Lexer<'a> {
     pub fn next_token(&mut self) -> Result<(Token, Location), SidlError> {
         self.skip_whitespace_and_comments()?;
 
-        let start_loc = Location { line: self.line, col: self.col };
+        let start_loc = Location {
+            line: self.line,
+            col: self.col,
+        };
 
         match self.advance() {
             Some('{') => Ok((Token::BraceOpen, start_loc)),
@@ -99,7 +105,10 @@ impl<'a> Lexer<'a> {
                     self.advance();
                     Ok((Token::Arrow, start_loc))
                 } else {
-                    Err(SidlError::UnexpectedChar { char: '-', loc: start_loc })
+                    Err(SidlError::UnexpectedChar {
+                        char: '-',
+                        loc: start_loc,
+                    })
                 }
             }
             Some(c) if c.is_alphabetic() || c == '_' => {
@@ -107,7 +116,10 @@ impl<'a> Lexer<'a> {
                 Ok((token, start_loc))
             }
             None => Ok((Token::Eof, start_loc)),
-            Some(c) => Err(SidlError::UnexpectedChar { char: c, loc: start_loc }),
+            Some(c) => Err(SidlError::UnexpectedChar {
+                char: c,
+                loc: start_loc,
+            }),
         }
     }
 
@@ -116,12 +128,12 @@ impl<'a> Lexer<'a> {
         ident.push(start);
 
         while let Some(&c) = self.peek_char() {
-             if c.is_alphanumeric() || c == '_' {
-                 ident.push(c);
-                 self.advance();
-             } else {
-                 break;
-             }
+            if c.is_alphanumeric() || c == '_' {
+                ident.push(c);
+                self.advance();
+            } else {
+                break;
+            }
         }
 
         match ident.as_str() {
@@ -141,14 +153,17 @@ mod tests {
     fn test_lex_basic() {
         let input = "struct Foo { x: i32 }";
         let mut lexer = Lexer::new(input);
-        
+
         assert!(matches!(lexer.next_token().unwrap(), (Token::Struct, _)));
         assert!(matches!(lexer.next_token().unwrap(), (Token::Ident(s), _) if s == "Foo"));
         assert!(matches!(lexer.next_token().unwrap(), (Token::BraceOpen, _)));
         assert!(matches!(lexer.next_token().unwrap(), (Token::Ident(s), _) if s == "x"));
         assert!(matches!(lexer.next_token().unwrap(), (Token::Colon, _)));
         assert!(matches!(lexer.next_token().unwrap(), (Token::Ident(s), _) if s == "i32"));
-        assert!(matches!(lexer.next_token().unwrap(), (Token::BraceClose, _)));
+        assert!(matches!(
+            lexer.next_token().unwrap(),
+            (Token::BraceClose, _)
+        ));
         assert!(matches!(lexer.next_token().unwrap(), (Token::Eof, _)));
     }
 
@@ -165,7 +180,10 @@ mod tests {
         assert!(matches!(lexer.next_token().unwrap(), (Token::Struct, _)));
         assert!(matches!(lexer.next_token().unwrap(), (Token::Ident(s), _) if s == "Foo"));
         assert!(matches!(lexer.next_token().unwrap(), (Token::BraceOpen, _)));
-        assert!(matches!(lexer.next_token().unwrap(), (Token::BraceClose, _)));
+        assert!(matches!(
+            lexer.next_token().unwrap(),
+            (Token::BraceClose, _)
+        ));
         assert!(matches!(lexer.next_token().unwrap(), (Token::Eof, _)));
     }
 
@@ -173,7 +191,7 @@ mod tests {
     fn test_location() {
         let input = "struct\nFoo";
         let mut lexer = Lexer::new(input);
-        
+
         let (_, loc) = lexer.next_token().unwrap();
         assert_eq!(loc.line, 1);
         assert_eq!(loc.col, 1);
@@ -194,7 +212,7 @@ mod tests {
                 assert_eq!(char, '%');
                 assert_eq!(loc.line, 1);
                 assert_eq!(loc.col, 8); // 'struct' is 6 chars + space = 7. Next is 8?
-                // 'struct' consumes 6. Lexer is at col 7 (space). 
+                // 'struct' consumes 6. Lexer is at col 7 (space).
                 // skip_whitespace consumes space (col 7). Lexer at col 8 matching '%'.
                 // Yes.
             }
