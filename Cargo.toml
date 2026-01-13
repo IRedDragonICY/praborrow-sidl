@@ -14,7 +14,9 @@ proc-macro = true
 syn = { workspace = true }
 quote = { workspace = true }
 proc-macro2 = { workspace = true }
+thiserror = { workspace = true }
 crc64fast = "1.0"
+
 
 [dev-dependencies]
 praborrow-diplomacy = { path = "../praborrow-diplomacy" }

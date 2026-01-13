@@ -1,5 +1,6 @@
 mod lexer;
 mod parser;
+mod error;
 
 use crate::lexer::Lexer;
 use crate::parser::{Def, Parser};
@@ -19,12 +20,40 @@ pub fn include_sidl(input: TokenStream) -> TokenStream {
 
     let sidl_content = match fs::read_to_string(&path) {
         Ok(content) => content,
-        Err(e) => panic!("Failed to read SIDL file {:?}: {}", path, e),
+        Err(e) => {
+            return syn::Error::new(
+                proc_macro2::Span::call_site(),
+                format!("Failed to read SIDL file {:?}: {}", path, e),
+            )
+            .to_compile_error()
+            .into();
+        }
     };
 
     let lexer = Lexer::new(&sidl_content);
-    let mut parser = Parser::new(lexer);
-    let defs = parser.parse();
+    let mut parser = match Parser::new(lexer) {
+        Ok(p) => p,
+        Err(e) => {
+            return syn::Error::new(
+                proc_macro2::Span::call_site(),
+                format!("SIDL Parser Init Error: {}", e),
+            )
+            .to_compile_error()
+            .into();
+        }
+    };
+
+    let defs = match parser.parse() {
+        Ok(d) => d,
+        Err(e) => {
+            return syn::Error::new(
+                proc_macro2::Span::call_site(),
+                format!("SIDL Parse Error: {}", e),
+            )
+            .to_compile_error()
+            .into();
+        }
+    };
 
     let mut expanded_tokens = proc_macro2::TokenStream::new();
 

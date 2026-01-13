@@ -1,3 +1,4 @@
+use crate::error::SidlError;
 use crate::lexer::{Lexer, Token};
 
 #[derive(Debug)]
@@ -32,88 +33,96 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(mut lexer: Lexer<'a>) -> Self {
-        let current_token = lexer.next_token();
-        Self {
+    pub fn new(mut lexer: Lexer<'a>) -> Result<Self, SidlError> {
+        let current_token = lexer.next_token()?;
+        Ok(Self {
             lexer,
             current_token,
-        }
+        })
     }
 
-    fn advance(&mut self) {
-        self.current_token = self.lexer.next_token();
+    fn advance(&mut self) -> Result<(), SidlError> {
+        self.current_token = self.lexer.next_token()?;
+        Ok(())
     }
 
-    fn expect(&mut self, expected: Token) {
+    fn expect(&mut self, expected: Token) -> Result<(), SidlError> {
         if self.current_token == expected {
-            self.advance();
+            self.advance()?;
+            Ok(())
         } else {
-            panic!("Expected {:?}, found {:?}", expected, self.current_token);
+            Err(SidlError::UnexpectedToken {
+                expected: format!("{:?}", expected),
+                found: format!("{:?}", self.current_token),
+            })
         }
     }
 
-    fn parse_ident(&mut self) -> String {
+    fn parse_ident(&mut self) -> Result<String, SidlError> {
         if let Token::Ident(name) = &self.current_token {
             let name = name.clone();
-            self.advance();
-            name
+            self.advance()?;
+            Ok(name)
         } else {
-            panic!("Expected identifier, found {:?}", self.current_token);
+            Err(SidlError::UnexpectedToken {
+                expected: "Identifier".to_string(),
+                found: format!("{:?}", self.current_token),
+            })
         }
     }
 
-    pub fn parse(&mut self) -> Vec<Def> {
+    pub fn parse(&mut self) -> Result<Vec<Def>, SidlError> {
         let mut defs = Vec::new();
         loop {
             match self.current_token {
-                Token::Struct => defs.push(Def::Struct(self.parse_struct())),
-                Token::Service => defs.push(Def::Service(self.parse_service())),
+                Token::Struct => defs.push(Def::Struct(self.parse_struct()?)),
+                Token::Service => defs.push(Def::Service(self.parse_service()?)),
                 Token::Eof => break,
-                _ => panic!("Unexpected token at top level: {:?}", self.current_token),
+                _ => return Err(SidlError::UnexpectedTopLevelToken(format!("{:?}", self.current_token))),
             }
         }
-        defs
+        Ok(defs)
     }
 
-    fn parse_struct(&mut self) -> StructDef {
-        self.advance(); // consume 'struct'
-        let name = self.parse_ident();
+    fn parse_struct(&mut self) -> Result<StructDef, SidlError> {
+        self.advance()?; // consume 'struct'
+        let name = self.parse_ident()?;
 
-        self.expect(Token::BraceOpen);
+        self.expect(Token::BraceOpen)?;
 
         let mut fields = Vec::new();
         while self.current_token != Token::BraceClose {
-            let field_name = self.parse_ident();
-            self.expect(Token::Colon);
-            let field_type = self.parse_ident();
-            self.expect(Token::Comma);
+            let field_name = self.parse_ident()?;
+            self.expect(Token::Colon)?;
+            let field_type = self.parse_ident()?;
+            self.expect(Token::Comma)?;
             fields.push((field_name, field_type));
         }
 
-        self.expect(Token::BraceClose);
-        StructDef { name, fields }
+        self.expect(Token::BraceClose)?;
+        Ok(StructDef { name, fields })
     }
 
-    fn parse_service(&mut self) -> ServiceDef {
-        self.advance(); // consume 'service'
-        let name = self.parse_ident();
+    fn parse_service(&mut self) -> Result<ServiceDef, SidlError> {
+        self.advance()?; // consume 'service'
+        let name = self.parse_ident()?;
 
-        self.expect(Token::BraceOpen);
+        self.expect(Token::BraceOpen)?;
 
         let mut methods = Vec::new();
         while self.current_token != Token::BraceClose {
-            self.expect(Token::Fn);
-            let method_name = self.parse_ident();
+            self.expect(Token::Fn)?;
+            let method_name = self.parse_ident()?;
 
-            self.expect(Token::ParenOpen);
-            let arg_name = self.parse_ident();
-            self.expect(Token::Colon);
-            let arg_type = self.parse_ident();
-            self.expect(Token::ParenClose);
+            self.expect(Token::ParenOpen)?;
+            let arg_name = self.parse_ident()?;
+            self.expect(Token::Colon)?;
+            let arg_type = self.parse_ident()?;
+            self.expect(Token::ParenClose)?;
 
-            self.expect(Token::Arrow);
-            let ret_type = self.parse_ident();
-            self.expect(Token::SemiColon);
+            self.expect(Token::Arrow)?;
+            let ret_type = self.parse_ident()?;
+            self.expect(Token::SemiColon)?;
 
             methods.push(MethodDef {
                 name: method_name,
@@ -123,7 +132,7 @@ impl<'a> Parser<'a> {
             });
         }
 
-        self.expect(Token::BraceClose);
-        ServiceDef { name, methods }
+        self.expect(Token::BraceClose)?;
+        Ok(ServiceDef { name, methods })
     }
 }

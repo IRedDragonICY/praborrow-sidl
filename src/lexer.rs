@@ -1,3 +1,4 @@
+use crate::error::SidlError;
 use std::iter::Peekable;
 use std::str::Chars;
 
@@ -29,28 +30,28 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn next_token(&mut self) -> Token {
+    pub fn next_token(&mut self) -> Result<Token, SidlError> {
         self.skip_whitespace();
 
         match self.chars.next() {
-            Some('{') => Token::BraceOpen,
-            Some('}') => Token::BraceClose,
-            Some('(') => Token::ParenOpen,
-            Some(')') => Token::ParenClose,
-            Some(':') => Token::Colon,
-            Some(';') => Token::SemiColon,
-            Some(',') => Token::Comma,
+            Some('{') => Ok(Token::BraceOpen),
+            Some('}') => Ok(Token::BraceClose),
+            Some('(') => Ok(Token::ParenOpen),
+            Some(')') => Ok(Token::ParenClose),
+            Some(':') => Ok(Token::Colon),
+            Some(';') => Ok(Token::SemiColon),
+            Some(',') => Ok(Token::Comma),
             Some('-') => {
                 if let Some('>') = self.chars.peek() {
                     self.chars.next();
-                    Token::Arrow
+                    Ok(Token::Arrow)
                 } else {
-                    panic!("Unexpected char '-'");
+                    Err(SidlError::UnexpectedChar('-'))
                 }
             }
-            Some(c) if c.is_alphabetic() || c == '_' => self.lex_ident(c),
-            None => Token::Eof,
-            Some(c) => panic!("Unexpected char '{}'", c),
+            Some(c) if c.is_alphabetic() || c == '_' => Ok(self.lex_ident(c)),
+            None => Ok(Token::Eof),
+            Some(c) => Err(SidlError::UnexpectedChar(c)),
         }
     }
 
